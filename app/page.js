@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-const APP_VERSION="v5.3";
+const APP_VERSION="v5.4";
 const T={bg:"#08090e",card:"#10111a",cardHover:"#161724",border:"#1c1d30",text:"#dcdff0",dim:"#555775",accent:"#818cf8",accentBg:"rgba(129,140,248,0.1)",green:"#4ade80",greenBg:"rgba(74,222,128,0.08)",red:"#fb7185",redBg:"rgba(251,113,133,0.08)",amber:"#fbbf24",amberBg:"rgba(251,191,36,0.08)",blue:"#60a5fa",blueBg:"rgba(96,165,250,0.08)",purple:"#c084fc",purpleBg:"rgba(192,132,252,0.08)",doordash:"#FF3008",ubereats:"#06C167",dateText:"#b0b4cc",cyan:"#22d3ee",cyanBg:"rgba(34,211,238,0.08)"};
 const CATS=["Business Meals & Entertainment","Car & Truck Expenses","Travel & Lodging","Office Supplies & Software","Subscriptions & Memberships","Telephone & Internet","Shipping & Delivery","Insurance","Rent & Lease","Utilities","Wages & Salaries","Education & Training","Equipment & Hardware","Advertising & Promotion","Bank Charges & Fees","Contractors & Freelancers","Interest & Penalties","Legal & Professional Services","Repairs & Maintenance","Taxes & Licenses","Other / Uncategorized"];
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -32,6 +32,10 @@ const WAVE_EXPENSES=[
   {id:"QWNjb3VudDoyMjA5OTkyMDg2Mzk1MTM2NzkzO0J1c2luZXNzOmNjZGY2YWI0LWQxM2YtNDY0ZS1hNjNkLWUzM2Q1NGIyN2FhOA==",name:"Work Support (Upwork)"},
   {id:"QWNjb3VudDoxODU5NjMwMzQ5MDA1NDY1OTc4O0J1c2luZXNzOmNjZGY2YWI0LWQxM2YtNDY0ZS1hNjNkLWUzM2Q1NGIyN2FhOA==",name:"Uncategorized Expense"},
   {id:"QWNjb3VudDoxOTU1NDY5MTIzODc4MjM0ODU3O0J1c2luZXNzOmNjZGY2YWI0LWQxM2YtNDY0ZS1hNjNkLWUzM2Q1NGIyN2FhOA==",name:"Accounting Services"},
+  {id:"QWNjb3VudDoyNTkyNTU2NDgxNzk0NjQ4OTYwO0J1c2luZXNzOmNjZGY2YWI0LWQxM2YtNDY0ZS1hNjNkLWUzM2Q1NGIyN2FhOA==",name:"Wages & Salaries"},
+  {id:"QWNjb3VudDoyNTkyNTU3MTEyOTUzNTE0OTk5O0J1c2luZXNzOmNjZGY2YWI0LWQxM2YtNDY0ZS1hNjNkLWUzM2Q1NGIyN2FhOA==",name:"Contractors & Freelancers"},
+  {id:"QWNjb3VudDoyNTkyNTU3MjU1NjQzNzM2MDgyO0J1c2luZXNzOmNjZGY2YWI0LWQxM2YtNDY0ZS1hNjNkLWUzM2Q1NGIyN2FhOA==",name:"Insurance"},
+  {id:"QWNjb3VudDoyNTkyNTU2NjMwMDg4NDYxMTk2O0J1c2luZXNzOmNjZGY2YWI0LWQxM2YtNDY0ZS1hNjNkLWUzM2Q1NGIyN2FhOA==",name:"Bank Charges & Fees"},
 ];
 const SRC={creditcard:{label:"Credit Card",icon:"💳",color:T.accent},doordash:{label:"DoorDash",icon:"🔴",color:T.doordash},ubereats:{label:"Uber Eats",icon:"🟢",color:T.ubereats},uber:{label:"Uber Rides",icon:"🚗",color:"#aaa"},copilot:{label:"Copilot",icon:"📊",color:T.cyan}};
 const COFFEE=/starbucks|dunkin|peet|philz|blue\s*bottle|coffee|cafe|latte|espresso|dutch\s*bros|republik coffee/i;
@@ -87,7 +91,8 @@ function dayAfter(d){const dt=new Date(d);dt.setDate(dt.getDate()+2);return dt.t
 function stripQ(s){return(s||"").replace(/^"|"$/g,"").trim()}
 
 // Wave category mapping from our categories
-function waveExpenseId(cat){const m={"Business Meals & Entertainment":WAVE_EXPENSES[0].id,"Car & Truck Expenses":WAVE_EXPENSES[1].id,"Travel & Lodging":WAVE_EXPENSES[2].id,"Office Supplies & Software":WAVE_EXPENSES[5].id,"Technology":WAVE_EXPENSES[4].id,"Telephone & Internet":WAVE_EXPENSES[6].id,"Subscriptions & Memberships":WAVE_EXPENSES[4].id,"Rent & Lease":WAVE_EXPENSES[10].id,"Utilities":WAVE_EXPENSES[11].id,"Wages & Salaries":WAVE_EXPENSES[12].id,"Contractors & Freelancers":WAVE_EXPENSES[12].id,"Education & Training":WAVE_EXPENSES[7].id,"Health & Wellness R&D":WAVE_EXPENSES[8].id,"Insurance":WAVE_EXPENSES[13].id,"Bank Charges & Fees":WAVE_EXPENSES[14].id,"Shipping & Delivery":WAVE_EXPENSES[5].id,"Repairs & Maintenance":WAVE_EXPENSES[5].id};return m[cat]||WAVE_EXPENSES[13].id}
+function waveAcctByName(nm){const a=WAVE_EXPENSES.find(x=>x.name===nm);return a?a.id:null}
+function waveExpenseId(cat){const m={"Business Meals & Entertainment":"Business Meals","Car & Truck Expenses":"Transportation","Travel & Lodging":"Travel","Office Supplies & Software":"Supplies","Technology":"Technology","Telephone & Internet":"Internet & Mobile Device","Subscriptions & Memberships":"Technology","Rent & Lease":"Rent Expenses","Utilities":"Utilities","Wages & Salaries":"Wages & Salaries","Contractors & Freelancers":"Contractors & Freelancers","Education & Training":"Educational Expenses","Health & Wellness R&D":"Health & Wellness R&D","Insurance":"Insurance","Bank Charges & Fees":"Bank Charges & Fees","Shipping & Delivery":"Supplies","Repairs & Maintenance":"Supplies","Advertising & Promotion":"Office Expenses","Legal & Professional Services":"Accounting Services","Interest & Penalties":"Bank Charges & Fees"};const name=m[cat]||"Uncategorized Expense";return waveAcctByName(name)||waveAcctByName("Uncategorized Expense")||WAVE_EXPENSES[13].id}
 // Short description for Wave description field
 function waveDesc(t){if(t.waveDescOverride)return t.waveDescOverride;if(t.source==="ubereats")return cleanVendor(t.restaurant||t.rawMerchant||"Uber Eats order");if(t.source==="doordash")return cleanVendor(t.restaurant||t.rawMerchant||"DoorDash order");if(t.source==="uber")return"Uber";const v=cleanVendor(t.rawMerchant||t.restaurant||"");return v||(t.description||"Expense").split(" — ")[0].split(" to discuss")[0].slice(0,60)}
 
