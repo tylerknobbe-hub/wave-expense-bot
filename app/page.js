@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-const APP_VERSION="v5.1";
+const APP_VERSION="v5.2";
 const T={bg:"#08090e",card:"#10111a",cardHover:"#161724",border:"#1c1d30",text:"#dcdff0",dim:"#555775",accent:"#818cf8",accentBg:"rgba(129,140,248,0.1)",green:"#4ade80",greenBg:"rgba(74,222,128,0.08)",red:"#fb7185",redBg:"rgba(251,113,133,0.08)",amber:"#fbbf24",amberBg:"rgba(251,191,36,0.08)",blue:"#60a5fa",blueBg:"rgba(96,165,250,0.08)",purple:"#c084fc",purpleBg:"rgba(192,132,252,0.08)",doordash:"#FF3008",ubereats:"#06C167",dateText:"#b0b4cc",cyan:"#22d3ee",cyanBg:"rgba(34,211,238,0.08)"};
 const CATS=["Business Meals & Entertainment","Car & Truck Expenses","Travel & Lodging","Office Supplies & Software","Subscriptions & Memberships","Telephone & Internet","Shipping & Delivery","Insurance","Rent & Lease","Utilities","Wages & Salaries","Education & Training","Equipment & Hardware","Advertising & Promotion","Bank Charges & Fees","Contractors & Freelancers","Interest & Penalties","Legal & Professional Services","Repairs & Maintenance","Taxes & Licenses","Other / Uncategorized"];
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
