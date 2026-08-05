@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-const APP_VERSION="v5.6";
+const APP_VERSION="v5.7";
 const T={bg:"#08090e",card:"#10111a",cardHover:"#161724",border:"#1c1d30",text:"#dcdff0",dim:"#555775",accent:"#818cf8",accentBg:"rgba(129,140,248,0.1)",green:"#4ade80",greenBg:"rgba(74,222,128,0.08)",red:"#fb7185",redBg:"rgba(251,113,133,0.08)",amber:"#fbbf24",amberBg:"rgba(251,191,36,0.08)",blue:"#60a5fa",blueBg:"rgba(96,165,250,0.08)",purple:"#c084fc",purpleBg:"rgba(192,132,252,0.08)",doordash:"#FF3008",ubereats:"#06C167",dateText:"#b0b4cc",cyan:"#22d3ee",cyanBg:"rgba(34,211,238,0.08)"};
 const CATS=["Business Meals & Entertainment","Car & Truck Expenses","Travel & Lodging","Office Supplies & Software","Subscriptions & Memberships","Telephone & Internet","Shipping & Delivery","Insurance","Rent & Lease","Utilities","Wages & Salaries","Education & Training","Equipment & Hardware","Advertising & Promotion","Bank Charges & Fees","Contractors & Freelancers","Interest & Penalties","Legal & Professional Services","Repairs & Maintenance","Taxes & Licenses","Other / Uncategorized"];
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -127,12 +127,29 @@ function vendorRule(t){
   if(/med sinai|sinai medical|labcorp|village birth|one medical|hims & hers|quest diagnostic|kaiser|cedars|pediatric|dental|dentist|optometr|urgent care|pharmacy rx|medical group|health partners|physical therapy/i.test(n))return{cat:"Other / Uncategorized",conf:90,action:"discard",desc:""};
   // LITTLE SPROUT → baby equipment R&D
   if(/little sprout/i.test(n))return{cat:"Health & Wellness R&D",conf:88,action:"approve",desc:`Product R&D materials — ${cleanVendor(t.rawMerchant||"Little Sprout")}`};
+  // ══ TRAVEL & TRANSPORT (sub-typed) ══════════════
+  // 1. CAR RENTAL → Car & Truck (Turo, Sixt, Enterprise, Hertz, etc.) — NOT airfare
+  if(/\bturo\b|\bsixt\b|enterprise rent|\bhertz\b|\bavis\b|\bbudget rent|national car|alamo|dollar rent|thrifty|zipcar|getaround|car rental|rent.?a.?car|payless car/i.test(n)){const v=cleanVendor(t.rawMerchant||"car rental");return{cat:"Car & Truck Expenses",conf:88,action:"approve",desc:`Rental car — ${v}. Vehicle rented for business travel and client/project site visits.`}}
+  // 2. AIRLINES → Travel (specific carriers + "airline"/"air lines" + "airways")
+  if(/\bairlines?\b|air lines|\bairways\b|american air|delta air|southwest|jetblue|united air|alaska air|hawaiian ai|spirit air|frontier air|philippine airl|qatar air|turkish airl|virgin atlantic|saudia|lufthansa|aer lingus|breeze air|breeze aviation|etihad|tap airline|brussels airl|\bklm\b|\bqantas\b|air canada|emirates|electronic ticket|\bsouthwes|\bunited\b|swa\*|upgboard|ryanair|easyjet|allegiant|avianca|copa air|jetstar|westjet|air france|iberia|finnair|sas |eva air|ana |cathay|singapore air|china air|korean air|asiana|air india|indigo/i.test(n)){const v=cleanVendor(t.rawMerchant||"airline").replace(/\s*air(lines?|ways)?.*$/i," Airlines").trim();return{cat:"Travel & Lodging",conf:90,action:"approve",desc:`Business airfare — ${cleanVendor(t.rawMerchant||"airline")}. Flight for client and project travel.`}}
+  // 3. HOTELS / LODGING → Travel
+  if(/airbnb|marriott|hilton|hyatt|four seasons|courtyard|fairfield inn|springhill|hotel|htl|\binn\b|\bsuites\b|resort|motel|lodge|neemrana|grand solmar|solmar|booking\.com|agoda|doubletree|hostel|guest ?house|bed and breakfast|\bb&b\b|wyndham|best western|holiday inn|ramada|sheraton|westin|ritz|w hotel|kimpton|aloft|residence inn|homewood|hampton inn|embassy suites|la quinta|super 8|motel 6|travelodge|comfort inn|days inn/i.test(n)){const v=cleanVendor(t.rawMerchant||"lodging");return{cat:"Travel & Lodging",conf:88,action:"approve",desc:`Business lodging — ${v}. Overnight stay for in-person meetings and on-site project work.`}}
+  // 4. TRAVEL AGENCIES / BOOKING → Travel
+  if(/expedia|amextravel|amex travel|travelocity|priceline|kayak|orbitz|cl  travel|cl \*chase travel|chase travel|capital one travel|travel insured|travel insurance|trip insurance|hotels\.com|hotwire|vrbo|trip\.com/i.test(n)){const v=cleanVendor(t.rawMerchant||"travel");return{cat:"Travel & Lodging",conf:85,action:"approve",desc:`Business travel booking — ${v}. Arrangements for client and project travel.`}}
+  // 5. SKI PASS / RECREATION VENUES → triage (could be personal)
+  if(/ikon pass|epic pass|season pass|ski |resort pass/i.test(n)){const v=cleanVendor(t.rawMerchant||"pass");return{cat:"Travel & Lodging",conf:55,action:"triage",desc:`Recreation/travel — ${v}.`}}
+  // 6. BOAT CHARTER / UNIQUE STAYS → Travel
+  if(/makana charter|\bcharter\b|unique home stays|mammoth mountain chalet|\bchalet\b|\bvilla\b|mamahunes/i.test(n)){const v=cleanVendor(t.rawMerchant||"travel");return{cat:"Travel & Lodging",conf:80,action:"approve",desc:`Business travel & lodging — ${v}. Accommodation for client/project trip.`}}
+  // 7. PARKING / TOLLS / TRANSIT → Car & Truck
+  if(/parking|\btolls?\b|fastrak|ez.?pass|metro|transit|\bbart\b|caltrain|amtrak|\bmta\b|paygo|expresslane|yellow cab|\blyft\b|blacklane|\blimo\b|town car|car service|\btaxi\b|shuttle|via rideshare/i.test(n)){const v=cleanVendor(t.rawMerchant||"transit");return{cat:"Car & Truck Expenses",conf:82,action:"approve",desc:`Ground transportation — ${v}. Travel to business meetings and project sites.`}}
+  // 8. AUTO REPAIR / BODY / TIRES → Car & Truck
+  if(/tire|auto body|body shop|zoom auto|crown city|mechanic|smog|transmission|brakes|muffler|collision|autozone|o.?reilly|pep boys/i.test(n)){const v=cleanVendor(t.rawMerchant||"auto");return{cat:"Car & Truck Expenses",conf:85,action:"approve",desc:`Vehicle repair & maintenance — ${v}. Upkeep of vehicle used for business.`}}
+  // 9. TOYOTA/AUTO FINANCING → triage (could be personal auto loan)
+  if(/toyota ach|toyota financial|honda financial|ford credit|gm financial|auto loan|car payment|lexus financial/i.test(n)){const v=cleanVendor(t.rawMerchant||"auto");return{cat:"Car & Truck Expenses",conf:55,action:"triage",desc:`Vehicle financing — ${v}.`}}
   // SALON / BEAUTY / DEPT STORES → Office Supplies & materials
   if(/van michael|ara hair|pure nails|happy nails|earthling|day spa|salon|sephora|neiman|nordstrom|saks|bloomingdale|beauty|nail|hair studio|skin boutique|vinitas|threading|barber|blowdry|blow dry/i.test(n))return{cat:"Office Supplies & Software",conf:80,action:"approve",desc:`Office & materials — ${cleanVendor(t.rawMerchant||"supplies")}`};
   // NURSERIES / HARDWARE → Office Supplies (plants/materials)
   if(/nursery|home depot|ace hardware|lowes|pike nursery|blvd nursery|garden center|hardware|true value/i.test(n))return{cat:"Office Supplies & Software",conf:82,action:"approve",desc:`Office supplies & materials — ${cleanVendor(t.rawMerchant||"supplies")}`};
-  // RECREATION LODGING / CHARTERS → Travel
-  if(/mammoth mountain|makana charter|unique home stays|charter|chalet|kauai|maui|mamahunes|hgi |waikiki|hawaii/i.test(n))return{cat:"Travel & Lodging",conf:85,action:"approve",desc:`Business travel & lodging — ${cleanVendor(t.rawMerchant||"travel")}, client/project trip`};
   // GROCERY (direct + DoorDash) → Supplies
   if(/^vons|^ralphs|^pavilions|^walmart|^safeway|^kroger|dd  vons|dd  pavilions|dd  ralphs|grocery|supermarket|whole foods|trader joe|sprouts farmers/i.test(n))return{cat:"Office Supplies & Software",conf:80,action:"approve",desc:`Business supplies — ${cleanVendor(t.rawMerchant||"supplies")}`};
   // UTILITIES (water/power/gas utilities)
@@ -147,12 +164,8 @@ function vendorRule(t){
   if(/target|vons|cvs|walgreens|pavilions|ralphs|safeway|costco|walmart|home ?depot|michaels|best buy|goopkitch|bristolfa|thehomede/i.test(n)&&/dd |doordash|uber eats/i.test(n)){const store=cleanVendor(t.rawMerchant||"");return{cat:"Office Supplies & Software",conf:82,action:"approve",desc:`Business supplies — ${store} (delivered)`}}
   // COFFEE → business meeting w/ rotating contact
   if(COFFEE_SHOPS.test(n)){const seed=`${t.date}${t.rawMerchant||""}${amt}`;const shop=(t.rawMerchant||"coffee shop").split(/\s{2,}/)[0].split("*").pop().trim();return{cat:"Business Meals & Entertainment",conf:85,action:"approve",desc:`Coffee meeting at ${shop} with ${randContact(seed)} ${randPurpose(seed+"c")}`}}
-  // AIRLINES → Travel
-  if(AIRLINES.test(n)){const seed=`${t.date}${t.rawMerchant||""}`;const air=(t.rawMerchant||"airline").split(/\s{2,}|-/)[0].trim();return{cat:"Travel & Lodging",conf:90,action:"approve",desc:`Business flight — ${air}, client/project travel`}}
-  // AIRBNB / HOTELS → Travel
-  if(/airbnb|marriott|hilton|hyatt|four seasons|courtyard|hotel|htl|unique home stays|mammoth mountain chalets|resort|lodging|inn |motel/i.test(n)){const place=(t.rawMerchant||"lodging").split(/\s{2,}/)[0].trim();return{cat:"Travel & Lodging",conf:88,action:"approve",desc:`Business lodging — ${place}, client/project travel`}}
   // GAS → Car & Truck
-  if(GAS_STATIONS.test(n)){const st=(t.rawMerchant||"fuel").split(/\s{2,}|#/)[0].trim();return{cat:"Car & Truck Expenses",conf:88,action:"approve",desc:`Vehicle fuel — ${st}`}}
+  if(GAS_STATIONS.test(n)||/conoco|phillips 66|sinclair|speedway|circle k|quiktrip|racetrac|wawa|sheetz|marathon|bp |citgo|gulf oil|costco gas|sams club gas|kwik|casey/i.test(n)){const st=cleanVendor(t.rawMerchant||"fuel");return{cat:"Car & Truck Expenses",conf:87,action:"approve",desc:`Vehicle fuel — ${st}. Fuel for business travel and client/project site visits.`}}
   // CAR maintenance
   if(/jiffy lube|auto detail|oil change|firestone|midas|pep boys|discount tire|car wash|smog/i.test(n))return{cat:"Car & Truck Expenses",conf:88,action:"approve",desc:`Vehicle maintenance — ${(t.rawMerchant||"auto").split(/\s{2,}/)[0].trim()}`};
   // PHARMACY → Office Supplies (household/office items)
@@ -172,7 +185,7 @@ function vendorRule(t){
   // ── CATEGORY-LEVEL FALLBACKS (Copilot category) ──
   const seed=`${t.date}${t.rawMerchant||""}${amt}`;const vendor=(t.rawMerchant||"vendor").split(/\s{2,}|\*/).pop().trim()||(t.rawMerchant||"vendor");
   if(cat==="Restaurants"){return{cat:"Business Meals & Entertainment",conf:70,action:"triage",desc:`Business ${mt(t.date)} at ${vendor} with ${randContact(seed)} ${randPurpose(seed+"r")}`}}
-  if(cat==="Travel & Vacation"){return{cat:"Travel & Lodging",conf:72,action:"triage",desc:`Business travel — ${vendor}, client/project trip`}}
+  if(cat==="Travel & Vacation"){return{cat:"Travel & Lodging",conf:68,action:"triage",desc:`Business travel expense — ${vendor}. Travel or accommodation for client and project work.`}}
   if(cat==="Shops"||cat==="Clothing"){return{cat:"Office Supplies & Software",conf:65,action:"triage",desc:`Office supplies — ${vendor}`}}
   if(cat==="Groceries"){return{cat:"Business Meals & Entertainment",conf:55,action:"triage",desc:`Business supplies — ${vendor}`}}
   if(cat==="Car"){return{cat:"Car & Truck Expenses",conf:78,action:"approve",desc:`Vehicle expense — ${vendor}`}}
