@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-const APP_VERSION="v5.0";
+const APP_VERSION="v5.1";
 const T={bg:"#08090e",card:"#10111a",cardHover:"#161724",border:"#1c1d30",text:"#dcdff0",dim:"#555775",accent:"#818cf8",accentBg:"rgba(129,140,248,0.1)",green:"#4ade80",greenBg:"rgba(74,222,128,0.08)",red:"#fb7185",redBg:"rgba(251,113,133,0.08)",amber:"#fbbf24",amberBg:"rgba(251,191,36,0.08)",blue:"#60a5fa",blueBg:"rgba(96,165,250,0.08)",purple:"#c084fc",purpleBg:"rgba(192,132,252,0.08)",doordash:"#FF3008",ubereats:"#06C167",dateText:"#b0b4cc",cyan:"#22d3ee",cyanBg:"rgba(34,211,238,0.08)"};
 const CATS=["Business Meals & Entertainment","Car & Truck Expenses","Travel & Lodging","Office Supplies & Software","Subscriptions & Memberships","Telephone & Internet","Shipping & Delivery","Insurance","Rent & Lease","Utilities","Wages & Salaries","Education & Training","Equipment & Hardware","Advertising & Promotion","Bank Charges & Fees","Contractors & Freelancers","Interest & Penalties","Legal & Professional Services","Repairs & Maintenance","Taxes & Licenses","Other / Uncategorized"];
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -196,7 +196,7 @@ function MonthlyChart({txns,catFilter,srcFilter}){const data=useMemo(()=>{const 
 export default function Home(){
   const[page,setPage]=useState("import");const[copilotTotal,setCopilotTotal]=useState(0);const[darkMode,setDarkMode]=useState(true);const[copilotCount,setCopilotCount]=useState(0);const[ddDialog,setDdDialog]=useState(false);const[triageItems,setTriageItems]=useState([]);const[triageMode,setTriageMode]=useState("");const[triageIdx,setTriageIdx]=useState(0);const[vendorKeep,setVendorKeep]=useState(new Set());const[vendorDiscard,setVendorDiscard]=useState(new Set());const[triageView,setTriageView]=useState("carousel");const[txns,setTxns]=useState([]);const[actLog,setActLog]=useState([]);const[showLog,setShowLog]=useState(false);const[proc,setProc]=useState(false);const[prog,setProg]=useState(null);
   const[gTok,setGTok]=useState("");const[oTok,setOTok]=useState("");const[apiKey,setApiKey]=useState("");
-  const[wTok,setWTok]=useState("");const[gCId,setGCId]=useState("");
+  const[wTok,setWTok]=useState("iDBncAWiVJ1RIsioUiJmtDEv7Htxhz");const[gCId,setGCId]=useState("279066778057-9s0bvbftvol3go4dh0kq93siv3mqeacj.apps.googleusercontent.com");
   const[modal,setModal]=useState(null);const[filt,setFilt]=useState("all");
   const[imp,setImp]=useState(new Set());const[thresh,setThresh]=useState(THR_DEF);
   const[rProg,setRProg]=useState(null);const[sel,setSel]=useState(new Set());const[sort,setSort]=useState({field:"date",dir:"asc"});
@@ -205,12 +205,13 @@ export default function Home(){
   const[pushProg,setPushProg]=useState(null);const[pushLog,setPushLog]=useState([]);
 
   // localStorage persistence
-  useEffect(()=>{try{const s=localStorage.getItem("wavebot-settings");if(s){const d=JSON.parse(s);if(d.wTok)setWTok(d.wTok);if(d.gTok)setGTok(d.gTok);if(d.oTok)setOTok(d.oTok);if(d.apiKey)setApiKey(d.apiKey);if(d.gCId)setGCId(d.gCId);if(d.anchorAcct)setAnchorAcct(d.anchorAcct);if(d.expenseAcct)setExpenseAcct(d.expenseAcct);if(d.thresh!=null)setThresh(d.thresh)}const sess=localStorage.getItem("wavebot-session");if(sess){const sd=JSON.parse(sess);if(sd.txns?.length>0){setTxns(sd.txns);setImp(new Set(sd.imp||[]));if(sd.copilotTotal)setCopilotTotal(sd.copilotTotal);if(sd.copilotCount)setCopilotCount(sd.copilotCount);setPage("review");console.log("Session restored:",sd.txns.length,"transactions")}}}catch(e){console.error("Restore error:",e)}},[]);
+  useEffect(()=>{try{const s=localStorage.getItem("wavebot-settings");if(s){const d=JSON.parse(s);if(d.wTok)setWTok(d.wTok);if(d.gTok)setGTok(d.gTok);if(d.oTok)setOTok(d.oTok);if(d.apiKey)setApiKey(d.apiKey);if(d.gCId)setGCId(d.gCId);if(d.anchorAcct)setAnchorAcct(d.anchorAcct);if(d.expenseAcct)setExpenseAcct(d.expenseAcct);if(d.thresh!=null)setThresh(d.thresh)}if(!d.wTok)setWTok("iDBncAWiVJ1RIsioUiJmtDEv7Htxhz");if(!d.gCId)setGCId("279066778057-9s0bvbftvol3go4dh0kq93siv3mqeacj.apps.googleusercontent.com");const sess=localStorage.getItem("wavebot-session");if(sess){const sd=JSON.parse(sess);if(sd.txns?.length>0){setTxns(sd.txns);setImp(new Set(sd.imp||[]));if(sd.copilotTotal)setCopilotTotal(sd.copilotTotal);if(sd.copilotCount)setCopilotCount(sd.copilotCount);setPage("review");console.log("Session restored:",sd.txns.length,"transactions")}}}catch(e){console.error("Restore error:",e)}},[]);
   const addLog=(type,msg,detail)=>{setActLog(p=>[{ts:new Date().toISOString(),type,msg,detail:detail||""},...p].slice(0,500))};
   const saveSession=()=>{try{localStorage.setItem("wavebot-session",JSON.stringify({txns,imp:[...imp],copilotTotal,copilotCount,savedAt:new Date().toISOString()}));alert(`Session saved: ${txns.length} transactions`)}catch(e){alert("Save failed: "+e.message)}};
   const clearSession=()=>{if(!confirm("Clear all imported transactions and start fresh?"))return;localStorage.removeItem("wavebot-session");setTxns([]);setImp(new Set());setTriageItems([]);setCopilotTotal(0);setCopilotCount(0);setPage("import")};
   const saveSettings=()=>{try{localStorage.setItem("wavebot-settings",JSON.stringify({wTok,gTok,oTok,apiKey,gCId,anchorAcct,expenseAcct,thresh,pushedIds:txns.filter(t=>t.status==='pushed').map(t=>({id:t.id,waveId:t.waveId,desc:waveDesc(t),date:nd(t.date),amt:t.amount}))}))}catch(e){}};
   useEffect(()=>{const h=e=>{if(e.data?.type==="oauth_token"){if(e.data.provider==="gmail")setGTok(e.data.token);else if(e.data.provider==="outlook")setOTok(e.data.token)}};window.addEventListener("message",h);return()=>window.removeEventListener("message",h)},[]);
+  useEffect(()=>{try{const cur=JSON.parse(localStorage.getItem("wavebot-settings")||"{}");localStorage.setItem("wavebot-settings",JSON.stringify({...cur,wTok,gTok,oTok,apiKey,gCId,anchorAcct,expenseAcct,thresh}))}catch(e){}},[wTok,gTok,oTok,apiKey,gCId,anchorAcct,expenseAcct,thresh]);
   const cGmail=()=>{if(!gCId){alert("Enter Client ID");return}window.open(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${gCId}&redirect_uri=${encodeURIComponent(window.location.origin+"/api/auth")}&response_type=token&scope=${encodeURIComponent("https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send")}&state=gmail&prompt=consent`,"_blank","width=500,height=600")};
 
   // ─── Import ─────────────────────────────────────
