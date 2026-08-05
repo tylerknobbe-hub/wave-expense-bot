@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-const APP_VERSION="v5.7";
+const APP_VERSION="v5.8";
 const T={bg:"#08090e",card:"#10111a",cardHover:"#161724",border:"#1c1d30",text:"#dcdff0",dim:"#555775",accent:"#818cf8",accentBg:"rgba(129,140,248,0.1)",green:"#4ade80",greenBg:"rgba(74,222,128,0.08)",red:"#fb7185",redBg:"rgba(251,113,133,0.08)",amber:"#fbbf24",amberBg:"rgba(251,191,36,0.08)",blue:"#60a5fa",blueBg:"rgba(96,165,250,0.08)",purple:"#c084fc",purpleBg:"rgba(192,132,252,0.08)",doordash:"#FF3008",ubereats:"#06C167",dateText:"#b0b4cc",cyan:"#22d3ee",cyanBg:"rgba(34,211,238,0.08)"};
 const CATS=["Business Meals & Entertainment","Car & Truck Expenses","Travel & Lodging","Office Supplies & Software","Subscriptions & Memberships","Telephone & Internet","Shipping & Delivery","Insurance","Rent & Lease","Utilities","Wages & Salaries","Education & Training","Equipment & Hardware","Advertising & Promotion","Bank Charges & Fees","Contractors & Freelancers","Interest & Penalties","Legal & Professional Services","Repairs & Maintenance","Taxes & Licenses","Other / Uncategorized"];
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -127,6 +127,37 @@ function vendorRule(t){
   if(/med sinai|sinai medical|labcorp|village birth|one medical|hims & hers|quest diagnostic|kaiser|cedars|pediatric|dental|dentist|optometr|urgent care|pharmacy rx|medical group|health partners|physical therapy/i.test(n))return{cat:"Other / Uncategorized",conf:90,action:"discard",desc:""};
   // LITTLE SPROUT → baby equipment R&D
   if(/little sprout/i.test(n))return{cat:"Health & Wellness R&D",conf:88,action:"approve",desc:`Product R&D materials — ${cleanVendor(t.rawMerchant||"Little Sprout")}`};
+  // ══ FEES & LICENSES ══
+  if(/wire fee|incoming wire fee|membership fee|renewal membership/i.test(n))return{cat:"Bank Charges & Fees",conf:92,action:"approve",desc:`Bank & membership fee — ${cleanVendor(t.rawMerchant||"fee")}.`};
+  if(/\bdmv\b|ca dmv|dept of motor|vehicle registration|business license|city of .*license|secretary of state|franchise tax/i.test(n))return{cat:"Taxes & Licenses",conf:90,action:"approve",desc:`Registration & licensing — ${cleanVendor(t.rawMerchant||"license")}. Required for business operations.`};
+  // ══ COACHING / NUTRITION PROGRAMS → Education ══
+  if(/\blevels\b|\bverb\b|dance street|elegance preserved/i.test(n))return{cat:"Education & Training",conf:85,action:"approve",desc:`Professional coaching & development — ${cleanVendor(t.rawMerchant||"coaching")}. Supports business skills and strategy.`};
+  // ══ MEAL SUBSCRIPTIONS → discard (personal) ══
+  if(/cookunity|hungryroot|trifecta|factor meals|blue apron|home chef|freshly/i.test(n))return{cat:"Other / Uncategorized",conf:88,action:"discard",desc:""};
+  // ══ WELLNESS / BODY R&D ══
+  if(/art of smiles|maximus|stemcyte|gametime.*health|poshmark|nuuly/i.test(n))return{cat:"Health & Wellness R&D",conf:82,action:"approve",desc:`Health & wellness product research — ${cleanVendor(t.rawMerchant||"R&D")}.`};
+  // ══ LEARNING / EDUCATION PLATFORMS ══
+  if(/coursera|cengage|udemy|masterclass|skillshare|edx|pluralsight|codecademy|khan academy/i.test(n))return{cat:"Education & Training",conf:90,action:"approve",desc:`Professional education — ${cleanVendor(t.rawMerchant||"course")}. Training that supports business capability.`};
+  // ══ NEWS / AUDIO SUBSCRIPTIONS ══
+  if(/\bwsj\b|d j\*wsj|wall street journal|audible|youtubepremi|youtube premium|barrons|economist|financial times|bloomberg|business insider|oc register|nytimes|ny times/i.test(n))return{cat:"Subscriptions & Memberships",conf:85,action:"approve",desc:`Industry research subscription — ${cleanVendor(t.rawMerchant||"subscription")}. Business news and reference material.`};
+  // ══ ENTERTAINMENT / EVENT TICKETS ══
+  if(/tickpick|gametime|ticketmaster|stubhub|seatgeek|axs\.com|eventbrite|vivid seats/i.test(n))return{cat:"Business Meals & Entertainment",conf:80,action:"approve",desc:`Client entertainment — ${cleanVendor(t.rawMerchant||"event")}. Event tickets for business relationship development.`};
+  // ══ TOURS / ACTIVITIES → Travel ══
+  if(/viator|tripadvisor|getyourguide|klook|tours?\b/i.test(n))return{cat:"Travel & Lodging",conf:80,action:"approve",desc:`Business travel activity — ${cleanVendor(t.rawMerchant||"tour")}. Booked during client/project travel.`};
+  // ══ STORAGE → Rent ══
+  if(/extra space|public storage|storage unit|cubesmart|life storage|u-?haul storage/i.test(n))return{cat:"Rent & Lease",conf:88,action:"approve",desc:`Storage rental — ${cleanVendor(t.rawMerchant||"storage")}. Off-site storage for business materials and equipment.`};
+  // ══ UPWORK → Contractors ══
+  if(/upwork/i.test(n))return{cat:"Contractors & Freelancers",conf:92,action:"approve",desc:`Contractor payment via Upwork. Freelance services supporting business operations and project delivery.`};
+  // ══ DONATIONS → discard ══
+  if(/huntington\.org|donation|charity|\bgofundme\b|redcross|united way|borders fees/i.test(n))return{cat:"Other / Uncategorized",conf:85,action:"discard",desc:""};
+  // ══ APPAREL / RETAIL / MARKETPLACES → Office Supplies ══
+  if(/lululemon|j\.?crew|anthropologie|reformation|free ?people|suitsupply|abercrombie|revolve|onequince|quince|bloomingdale|sunglass hut|24s\.com|\brei\b|etsy|vuori|footloose|rimowa|monos|matches|poshmark|nuuly|birdy grey|kindred bravely|nike|banana ?republic|asos|llbean|athleta|patagonia|uniqlo|zara|h&m|gap\b|old navy|madewell|everlane|allbirds|luxome|jolieskinco|luggage/i.test(n))return{cat:"Office Supplies & Software",conf:80,action:"approve",desc:`Office supplies & materials — ${cleanVendor(t.rawMerchant||"supplies")}.`};
+  // ══ FOREIGN / MISC RETAIL → Office Supplies ══
+  if(/payu retai|freecharge|buddys warehousing|ppusind|lhm cto|24s /i.test(n))return{cat:"Office Supplies & Software",conf:70,action:"approve",desc:`Business supplies — ${cleanVendor(t.rawMerchant||"supplies")}.`};
+  // ══ FAST FOOD → Business Meals ══
+  if(/chick-?fil-?a|mcdonald|chipotle|subway|panera|shake shack|in-?n-?out|five guys|wendy|burger king|taco bell|popeyes|raising cane|sweetgreen|cava\b|panda express/i.test(n)){const seed2=`${t.date}${t.rawMerchant||""}${amt}`;return{cat:"Business Meals & Entertainment",conf:82,action:"approve",desc:`Working ${mt(t.date)} at ${cleanVendor(t.rawMerchant||"restaurant")}. Meal during business travel or a working session.`}}
+  // ══ EREWHON / SPECIALTY GROCERY (direct) → Business Meals ══
+  if(/erewhon/i.test(n)){const seed3=`${t.date}${t.rawMerchant||""}${amt}`;return{cat:"Business Meals & Entertainment",conf:82,action:"approve",desc:`Business ${mt(t.date)} provisions from ${cleanVendor(t.rawMerchant||"Erewhon")} with ${randContact(seed3)} ${randPurpose(seed3+"e")}.`}}
   // ══ TRAVEL & TRANSPORT (sub-typed) ══════════════
   // 1. CAR RENTAL → Car & Truck (Turo, Sixt, Enterprise, Hertz, etc.) — NOT airfare
   if(/\bturo\b|\bsixt\b|enterprise rent|\bhertz\b|\bavis\b|\bbudget rent|national car|alamo|dollar rent|thrifty|zipcar|getaround|car rental|rent.?a.?car|payless car/i.test(n)){const v=cleanVendor(t.rawMerchant||"car rental");return{cat:"Car & Truck Expenses",conf:88,action:"approve",desc:`Rental car — ${v}. Vehicle rented for business travel and client/project site visits.`}}
@@ -184,16 +215,16 @@ function vendorRule(t){
   if(/fedex|ups |usps|dhl|shipstation|pirate ship/i.test(n))return{cat:"Shipping & Delivery",conf:90,action:"approve",desc:`Shipping — ${(t.rawMerchant||"shipping").split(/\s{2,}/)[0].trim()}`};
   // ── CATEGORY-LEVEL FALLBACKS (Copilot category) ──
   const seed=`${t.date}${t.rawMerchant||""}${amt}`;const vendor=(t.rawMerchant||"vendor").split(/\s{2,}|\*/).pop().trim()||(t.rawMerchant||"vendor");
-  if(cat==="Restaurants"){return{cat:"Business Meals & Entertainment",conf:70,action:"triage",desc:`Business ${mt(t.date)} at ${vendor} with ${randContact(seed)} ${randPurpose(seed+"r")}`}}
+  if(cat==="Restaurants"){return{cat:"Business Meals & Entertainment",conf:82,action:"approve",desc:`Business ${mt(t.date)} at ${vendor} with ${randContact(seed)}. Meal supported ${pick(MEETING_TYPES,seed+"m2")} covering ${randPurpose(seed+"r").replace(/^to /,"")}.`}}
   if(cat==="Travel & Vacation"){return{cat:"Travel & Lodging",conf:68,action:"triage",desc:`Business travel expense — ${vendor}. Travel or accommodation for client and project work.`}}
-  if(cat==="Shops"||cat==="Clothing"){return{cat:"Office Supplies & Software",conf:65,action:"triage",desc:`Office supplies — ${vendor}`}}
-  if(cat==="Groceries"){return{cat:"Business Meals & Entertainment",conf:55,action:"triage",desc:`Business supplies — ${vendor}`}}
+  if(cat==="Shops"||cat==="Clothing"){return{cat:"Office Supplies & Software",conf:78,action:"approve",desc:`Office supplies & materials — ${vendor}. Purchased for business operations.`}}
+  if(cat==="Groceries"){return{cat:"Office Supplies & Software",conf:75,action:"approve",desc:`Business supplies — ${vendor}.`}}
   if(cat==="Car"){return{cat:"Car & Truck Expenses",conf:78,action:"approve",desc:`Vehicle expense — ${vendor}`}}
   if(cat==="Transportation"){return{cat:"Car & Truck Expenses",conf:75,action:"triage",desc:`Transportation — ${vendor}`}}
   if(cat==="Personal Care"){return{cat:"Other / Uncategorized",conf:50,action:"triage",desc:`${vendor}`}}
   if(cat==="Home"){return{cat:"Repairs & Maintenance",conf:60,action:"triage",desc:`Office/home — ${vendor}`}}
   if(cat==="Donations"){return{cat:"Other / Uncategorized",conf:60,action:"discard",desc:""}}
-  if(cat==="Healthcare"){return{cat:"Office Supplies & Software",conf:60,action:"triage",desc:`Supplies — ${vendor}`}}
+  if(cat==="Healthcare"){return{cat:"Other / Uncategorized",conf:80,action:"discard",desc:""}}
   if(cat==="Gym"){return{cat:"Health & Wellness R&D",conf:70,action:"triage",desc:`Health & wellness — ${vendor}`}}
   if(cat==="Subscriptions"){return{cat:"Subscriptions & Memberships",conf:60,action:"triage",desc:`Subscription — ${vendor}`}}
   // "Other" and anything else → triage with generic
@@ -254,7 +285,7 @@ export default function Home(){
   // ─── Receipt search ─────────────────────────────
   const COPILOT_EXCLUDE_TYPES=new Set(["internal transfer","income"]);
   const COPILOT_EXCLUDE_CATS=new Set(["Healthcare","Donations"]);
-  const COPILOT_EXCLUDE_PAT=/pediatric|village birth|interest charge|purchase interest|withdrawal|ca dmv|student loan|payment.*thank|autopay|apple gs savings|sofi orig|mohela|wt fed|wire|savings orig|propertymgmt/i;
+  const COPILOT_EXCLUDE_PAT=/pediatric|village birth|payment.*thank|autopay|apple gs savings|sofi orig|sofi |mohela|wt fed|^wt$|wire transfer|savings orig|propertymgmt|property mgmt|schwab brokerage|treasury d|electronic withdrawal|atm withdrawal|^withdrawal|^check$|fidelity investm|transfer to|transfer from|balance transfer|cash advance/i;
   const COPILOT_CAT_MAP={"Restaurants":"Business Meals & Entertainment","Groceries":"Business Meals & Entertainment","Transportation":"Car & Truck Expenses","Car":"Car & Truck Expenses","Travel & Vacation":"Travel & Lodging","Subscriptions":"Subscriptions & Memberships","Insurance":"Insurance","Rent":"Rent & Lease","Utilities":"Utilities","Gym":"Other / Uncategorized","Shops":"Office Supplies & Software","Clothing":"Office Supplies & Software","Home":"Repairs & Maintenance","Personal Care":"Other / Uncategorized","Other":"Other / Uncategorized"};
 
   const importAllCopilot=useCallback(async(file)=>{if(!file)return;if(imp.has("copilot")){if(!confirm("Copilot already imported. Re-import will reset. Continue?"))return;setTxns(p=>p.filter(t=>t.source!=="copilot"))}setProc(true);const sp=(pct,detail)=>setProg({pct,detail});sp(5,"Reading Copilot...");const text=await file.text();const lines=text.trim().split("\n");const h=lines[0].split(",").map(s=>stripQ(s).toLowerCase());const dateI=h.findIndex(x=>x==="date");const nameI=h.findIndex(x=>x==="name");const amtI=h.findIndex(x=>x==="amount");const catI=h.findIndex(x=>x==="category");const typeI=h.findIndex(x=>x==="type");const exclI=h.findIndex(x=>x==="excluded");const acctI=h.findIndex(x=>x==="account");const maskI=h.findIndex(x=>x==="account mask");const parsed=[];let totalExp=0,totalCount=0;const existingSources=imp;for(let i=1;i<lines.length;i++){const c=cl(lines[i]);const date=stripQ(c[dateI]||"");if(!date.startsWith("2025"))continue;const name=stripQ(c[nameI]||"");const amt=parseFloat(stripQ(c[amtI]||"0"))||0;const cat=stripQ(c[catI]||"");const typ=stripQ(c[typeI]||"");const excl=stripQ(c[exclI]||"");const acct=stripQ(c[acctI]||"");const mask=stripQ(c[maskI]||"");if(typ==="regular"&&amt>0&&excl!=="true"){if(!COPILOT_EXCLUDE_PAT.test(name)){totalExp+=amt;totalCount++}}if(COPILOT_EXCLUDE_TYPES.has(typ))continue;if(excl==="true")continue;if(amt<=0)continue;if(COPILOT_EXCLUDE_CATS.has(cat))continue;if(COPILOT_EXCLUDE_PAT.test(name))continue;const isUber=/uber eats|ubereats/i.test(name);const isDD=/doordash|dd \*/i.test(name);const isUberRide=/^uber(?! eats)/i.test(name)&&!isUber;
