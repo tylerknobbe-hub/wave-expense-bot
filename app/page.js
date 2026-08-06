@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-const APP_VERSION="v5.8";
+const APP_VERSION="v6.0";
 const T={bg:"#08090e",card:"#10111a",cardHover:"#161724",border:"#1c1d30",text:"#dcdff0",dim:"#555775",accent:"#818cf8",accentBg:"rgba(129,140,248,0.1)",green:"#4ade80",greenBg:"rgba(74,222,128,0.08)",red:"#fb7185",redBg:"rgba(251,113,133,0.08)",amber:"#fbbf24",amberBg:"rgba(251,191,36,0.08)",blue:"#60a5fa",blueBg:"rgba(96,165,250,0.08)",purple:"#c084fc",purpleBg:"rgba(192,132,252,0.08)",doordash:"#FF3008",ubereats:"#06C167",dateText:"#b0b4cc",cyan:"#22d3ee",cyanBg:"rgba(34,211,238,0.08)"};
 const CATS=["Business Meals & Entertainment","Car & Truck Expenses","Travel & Lodging","Office Supplies & Software","Subscriptions & Memberships","Telephone & Internet","Shipping & Delivery","Insurance","Rent & Lease","Utilities","Wages & Salaries","Education & Training","Equipment & Hardware","Advertising & Promotion","Bank Charges & Fees","Contractors & Freelancers","Interest & Penalties","Legal & Professional Services","Repairs & Maintenance","Taxes & Licenses","Other / Uncategorized"];
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -50,6 +50,17 @@ const TOPICS=["ongoing project deliverables","upcoming milestones","supply and l
 function pick(arr,seed){return arr[Math.abs(hashStr(seed))%arr.length]}
 function cleanVendor(raw){if(!raw)return"vendor";let s=raw.replace(/dd \*doordash\s*/i,"").replace(/^dd\s+\*?/i,"").replace(/^dd\s{2,}/i,"").replace(/\*[a-z0-9]+/gi,"").replace(/\s{2,}.*$/,"").replace(/\s+#?\d{3,}.*$/,"").replace(/-[a-z0-9]{5,}$/i,"").replace(/\s+(orig desc|co entr).*$/i,"").trim();return s||raw.trim()}
 function richNotes(t){
+  const _conf=(t.confidence==null?70:t.confidence), _kind=t.kind||"";
+  const _v=cleanVendor(t.rawMerchant||t.restaurant||t.description||"")||"vendor";
+  // HONESTY GATE: never invent attendees/purpose for low-confidence or unknown entities.
+  if(_conf<65||_kind==="unknown"){
+    const c=t.category&&t.category!=="Other / Uncategorized"?` Recorded under ${t.category}.`:"";
+    return `Business expense — ${_v}.${c} Purpose to be confirmed from vendor records.`;
+  }
+  if(_conf<80&&t.category==="Business Meals & Entertainment"){
+    return `Business meal at ${_v}. Meal expense incurred in the course of business activity.`;
+  }
+
   const seed=`${t.date}${t.rawMerchant||t.restaurant||""}${t.amount}`;
   const v=cleanVendor(t.rawMerchant||t.restaurant||t.description||"");
   const contact=randContact(seed);const meeting=pick(MEETING_TYPES,seed+"m");const topic=pick(TOPICS,seed+"t");const topic2=pick(TOPICS,seed+"t2");
@@ -60,7 +71,7 @@ function richNotes(t){
   // Uber rides
   if(src==="uber")return `Ground transportation to ${meeting} with ${contact}. Trip supported in-person coordination on ${topic}. Business travel expense for client and project work.`;
   // Category-driven
-  if(cat==="Business Meals & Entertainment"){if(COFFEE_SHOPS&&COFFEE_SHOPS.test((t.rawMerchant||"").toLowerCase()))return `Coffee meeting with ${contact} at ${v}. Informal ${meeting.replace("a ","")} to discuss ${topic}. Business development and relationship-building expense.`;return `Business ${meal} at ${v} with ${contact}. Meal accompanied ${meeting} focused on ${topic} and ${topic2}.`}
+  if(cat==="Business Meals & Entertainment"){if(_kind&&!/restaurant|entertainment|coffee|food/.test(_kind)&&_conf<90)return `Business meal at ${_v}. Meal expense incurred in the course of business activity.`;if(COFFEE_SHOPS&&COFFEE_SHOPS.test((t.rawMerchant||"").toLowerCase()))return `Coffee meeting with ${contact} at ${v}. Informal ${meeting.replace("a ","")} to discuss ${topic}. Business development and relationship-building expense.`;return `Business ${meal} at ${v} with ${contact}. Meal accompanied ${meeting} focused on ${topic} and ${topic2}.`}
   if(cat==="Travel & Lodging"){if(/airbnb|hotel|htl|marriott|hilton|hyatt|resort|inn|lodging|four seasons|courtyard|chalet|villa|home stay/i.test((t.rawMerchant||"").toLowerCase()))return `Lodging at ${v} for client and project travel. Overnight stay required for in-person meetings and on-site work related to ${topic}.`;return `Business airfare booked through ${v} for client and project travel. Trip supported in-person meetings and on-site work covering ${topic}.`}
   if(cat==="Car & Truck Expenses"){if(/fuel|gas|76|chevron|shell|exxon|mobil|arco|texaco|valero|sunoco|ampm|chevron/i.test((t.rawMerchant||"").toLowerCase()))return `Vehicle fuel purchased at ${v} for business travel. Mileage related to client visits, site work, and project coordination.`;return `Vehicle expense at ${v} supporting business use of the vehicle for client visits and project-related travel.`}
   if(cat==="Wages & Salaries")return `Payroll processed through Gusto (pay date ${nd(t.date)}). Compensation for staff supporting business operations and project delivery.`;
@@ -73,6 +84,9 @@ function richNotes(t){
   if(cat==="Subscriptions & Memberships")return `Subscription to ${v} supporting business research, industry awareness, and ${topic}.`;
   if(cat==="Shipping & Delivery")return `Shipping and delivery through ${v} for business correspondence and product fulfillment.`;
   if(cat==="Repairs & Maintenance")return `Maintenance and supplies from ${v} for the business's office and workspace.`;
+  if(_kind==="entertainment")return `Client entertainment — ${_v}. Event tickets used for business relationship development.`;
+  if(_kind==="babyrnd")return `Product research materials — ${_v}. Purchased for health & wellness product development.`;
+  if(_kind==="equipment")return `Business equipment — ${_v}. Hardware supporting business operations.`;
   // Generic fallback
   return `Business expense at ${v}${cat?` categorized under ${cat}`:""}. Supports ongoing business operations and ${topic}.`;
 }
@@ -112,6 +126,95 @@ const GAS_STATIONS=/^76 |chevron|shell|exxon|mobil|arco|fuel depot|ampm|texaco|v
 const PHARMACY=/cvs|walgreens|rite aid|duane reade/i;
 const CONTRACTORS=/venmo|zelle|taskrabbit|ws jones consulting|jones consulting|upwork|fiverr|thumbtack/i;
 const GROCERY_PERSONAL=/hungryroot|little sprout|firefly/i;
+
+// ═══ VENDOR KNOWLEDGE BASE (v6.0) ═══
+// Curated entity knowledge. kind drives note voice; cat drives Wave account.
+const KB=[
+["Business Meals & Entertainment","restaurant",["gales rest","the boy & the bear","starbucks","bv commissary","chick-fil-a","keokis","entre nous","the raymond restaura","raz","uep","bistro na","santa and mikeys","all time","koloa thai","faraci pizza","the family room","coopers hawk","bog and barley","mint & martini","flamingo room","al-noor","union street french","la eats at sofi","mammoth rock","ancosti","mama's on the hill","jame enoteca","olio e piu","el pescador","sushikisen","urth caffe","phils bbq","boqueria","bivouac","salsa & beer","dos besos","republik coffee","chipotle","skadi","chases llc","miya thai","karas restaurant","cordova cafe","erewhon","bevmo","totalwine","total wine","sp eat better","parker palm springs","azure palm hot springs"]],
+["Business Meals & Entertainment","entertainment",["tickpick","indian wells tennis","gametime","ticketmaster","stubhub","seatgeek","eventbrite"]],
+["Travel & Lodging","airline",["american airlines","delta air","southwes","swa","jetblue","united","hawaiian ai","philippine airl","frontier ai","alaska air","spirit air","qatar air","turkish airl","virgin atlantic","saudia","lufthansa","aer lingus","breeze","etihad","tap airline","brussels airl","iberia","flight reservation","los angeles airport","aa wifi","electronic ticket"]],
+["Travel & Lodging","lodging",["airbnb","four seasons","courtyard","springhill suites","doubletree","marriott","the carriage house inn","ac hotel","eastside guesthouse","hgi kauai","unique home stays","mammoth mountain chalets","alta chalets","neemrana","grand solmar","booking.com","agoda","hilton","hyatt","fairfield inn","wyndham","best western","holiday inn","sheraton","westin","ritz","kimpton","residence inn","hampton inn","embassy suites"]],
+["Travel & Lodging","travelsvc",["viatortripadvisor","viator","expedia","amextravel","chase travel","travel insured","clear *clearme","clearme","makana charters","priceln","priceline"]],
+["Car & Truck Expenses","rental",["turo","sixt","alamo rent","enterprise ren","hertz","avis","budget rent","national car","zipcar","dollar rent","thrifty"]],
+["Car & Truck Expenses","fuel",["76 - gse","exxonmobil","shell","chevron","arco","fuel depot","bmb oil","conoco","valero","mobil","texaco","circle k","speedway","phillips 66"]],
+["Car & Truck Expenses","transit",["modern parking","the toll roads","yellow cab","rideyellow","lyft","blacklane","parkwhiz","amtrak","metro","fastrak","paygo","expresslane"]],
+["Car & Truck Expenses","autosvc",["jiffy lube","downtown auto detailin","crown city tire","zoom auto body","firestone","midas","autozone"]],
+["Office Supplies & Software","software",["typeform","canva","adobe","wix.com","rize.io","runway","claude.ai","openai","fireflies.ai","linkedin","bluehost","notion labs","google one","microsoft","figma","slack","dropbox","github","1password","zoom","anthropic"]],
+["Office Supplies & Software","retail",["amazon mktpl","amazon.com","amazon","etsy","wayfair","jossmain","joss","balsam hill","home depot","blvd nursery","pike nursery","ace hardware","lowes","target","walmart","vons","ralphs","safeway","pavilions","costco","michaels","the knot registry","city museum retail","namaste spiceland","sp whisperlinens","sp luxome","luxome","sp lila","sp happbrand","aw bridal"]],
+["Office Supplies & Software","apparel",["suitsupply","anthropologie","j.crew","llbean","bananarepublic","asos","revolve","onequince","quince","reformation","sezane","dissh","carters","hollister","adidas","nike.com","macys","calvinklein","loft","sp club l","sp 23rd by deanne","sp suitshop","academy tailor","paris tailors","footloose sports","nuuly","poshmark","lululemon","free people","vuori","rimowa","monos","sunglass hut","24s.com","bloomingdale","abercrombie","sp birdy grey","tb&tb - the grey stor","sp we are amma","matches","rei"]],
+["Office Supplies & Software","personalcare",["sephora","neimanmarcus","van michael salon","ara hair studio","pasadena skin boutique","earthling day spa","pure nails","happy nails","vinitas"]],
+["Technology","equipment",["best buy","bose corporation","bose","apple.com-us","sonos","dell","lenovo","logitech"]],
+["Health & Wellness R&D","wellness",["whoop","speakeasy fitness","ymca","sp athena club","athena club","equinox"]],
+["Health & Wellness R&D","babyrnd",["little sprout","lovevery","ergo baby","sp lalabu","lalabu","sp little sleepies","little sleepies","sp kindred bravely","kindred bravely","sp the ollie world","ollie world","stemcyte","maximus","art of smiles","sp jolieskinco","jolieskinco"]],
+["Education & Training","education",["jacob zemer coaching","coursera","coursra","cengage","levels","verb","dance street","elegance preserved","udemy","masterclass","skillshare"]],
+["Subscriptions & Memberships","subscription",["wsj","nytimes","oc register","business insider","audible","youtubepremi","tmf*motley fool","motley fool","consumerreports","sportsline","apple.com-bill","google one"]],
+["Subscriptions & Memberships","media",["spotify","hulu","peacock","youtube tv","amazon prime","netflix","disney","max","paramount"]],
+["Telephone & Internet","telecom",["spectrum","at&t","verizon","t-mobile","comcast","xfinity"]],
+["Insurance","insurance",["geico","lemonade insurance","state farm","allstate","progressive","zillion"]],
+["Wages & Salaries","payroll",["gusto"]],
+["Contractors & Freelancers","contractor",["venmo","zelle","taskrabbit","ws jones consulting","upwork","fiverr","thumbtack"]],
+["Bank Charges & Fees","fee",["late fee","purchase interest charge","interest charge","foreign transaction fee","domestic incoming wire fee","wire trans svc charge","renewal membership fee","membership fee","annual fee","overdraft"]],
+["Taxes & Licenses","license",["state of calif dmv","ca dmv","dmv","secretary of state","franchise tax","business license"]],
+["Utilities","utility",["pasadena waterpower","water and power","ladwp","socalgas","edison","pg&e"]],
+["Rent & Lease","rent",["extra space","public storage","cubesmart","liquidspace","wework","regus","industrious"]],
+["Shipping & Delivery","shipping",["fedex","usps","dhl","pirate ship","shipstation"]],
+["DISCARD","medical",["med*cedars sinai","cedars sinai","labcorp","village birth","one medical","onemed","hims & hers","hims hers","exer urgent care","south pasadena pediatric","ro health","quest diagnostic","kaiser","evergreen physical therapy","thatcher medical","aaron j epstein","ca dept of public health"]],
+["DISCARD","mealkit",["hungryroot","cookunity","trifecta","factor meals","blue apron","home chef"]],
+["DISCARD","donation",["www.huntington.org","huntington.org","borders fees","meta - ppgf","gofundme","redcross"]],
+];
+
+const KB_MAP=(()=>{const m=new Map();for(const[cat,kind,list]of KB)for(const v of list)m.set(v,{cat,kind});return m})();
+const KB_KEYS=[...KB_MAP.keys()].sort((a,b)=>b.length-a.length);
+
+// ─── L0: NORMALIZER ───────────────────────────────
+const PROC_PREFIX=/^(sq|tst|sp|pp|paypal|pypl|wf|fd|cl|dd|web|in|pos|apl|fh|dj|d j|sm|abc|rch)\s*\*\s*/i;
+function normVendor(raw){if(!raw)return"";let s=String(raw).trim();s=s.replace(PROC_PREFIX,"");s=s.replace(/^dd\s+\*?\s*doordash\s*/i,"");s=s.replace(/^dd\s{1,}/i,"");s=s.replace(/\*[a-z0-9]{4,}$/i,"");s=s.replace(/\s+#?\d{3,}.*$/,"");s=s.replace(/\s{2,}.*$/,"");s=s.replace(/\s+(orig desc|co entr|trace#).*$/i,"");s=s.replace(/[-\s]+(ca|ny|tx|fl|wa|il|gb|us|usa)$/i,"");return s.trim().toLowerCase()}
+
+// ─── L4: MORPHOLOGY SIGNALS ───────────────────────
+const FOOD_TOKEN=/\b(cafe|caf\u00e9|coffee|grill|grille|kitchen|bar|tavern|bistro|pizzeria|pizza|taqueria|taco|sushi|ramen|deli|diner|steakhouse|brewery|brewing|eatery|restaurant|resto|bbq|thai|noodle|burger|sandwich|bakery|patisserie|creamery|juice|smoothie|boba|donut|bagel|wings|seafood|oyster|chophouse|trattoria|osteria|cantina|pub|lounge|kabab|curry|pho|dumpling|wok|enoteca|ciderworks|winery|gastro|kababs|shawarma|falafel|dosa|biryani|shack|crab|lobster|steak|chicken|sports ?bar|ale ?house|roadhouse|creperie|churrasc|izakaya|teriyaki|hibachi|tapas|brasserie|rotisserie|smokehouse|barbeque|barbecue|panini|gelato|ice ?cream|frozen ?yogurt|patio|kabob|grillhouse|noodles|bowls?|eats)\b/i;
+const CORP_TOKEN=/\b(inc|corp|corporation|llc|ltd|technologies|systems|solutions|labs?|industries|holdings|group|enterprises|company|co)\b|\.(com|io|ai|net|org)\b/i;
+const RETAIL_TOKEN=/\b(store|shop|market|supply|outfitters|goods|mercantile|boutique|depot|warehouse|outlet)\b/i;
+const MED_TOKEN=/\b(medical|clinic|health|dental|dentist|pediatric|urgent care|hospital|physician|md\b|dds\b|therapy|diagnostic|pharmacy|surgery|orthodon)\b/i;
+const EDU_TOKEN=/\b(academy|institute|university|college|school|training|course|learning|certification|seminar|workshop)\b/i;
+
+// ─── RESOLVER: evidence-ranked ────────────────────
+// Returns {cat, kind, conf, action, tier}
+function resolveVendor(t){
+  const raw=t.rawMerchant||t.restaurant||t.description||"";
+  const nv=normVendor(raw);
+  const cop=t.copilotCategory||"";
+  if(!nv)return null;
+
+  // L1b: SOURCE-DERIVED — delivery platforms are definitive evidence of food (unless a store)
+  const rawLow=String(raw).toLowerCase();
+  const isDelivery=/doordash|uber ?eats|grubhub|postmates|seamless|caviar/.test(rawLow)||t.source==="doordash"||t.source==="ubereats";
+  const STORE_RX=/target|vons|cvs|walgreens|pavilions|ralphs|safeway|costco|walmart|home ?depot|michaels|best buy|officedep|office depot|staples|petco|petsmart|totalwine|total wine|bevmo|sprouts|whole ?foods|7-?eleven|rite aid|dollar tree/;
+  if(isDelivery){
+    if(STORE_RX.test(rawLow))return{cat:"Office Supplies & Software",kind:"retail",conf:88,action:"approve",tier:"src"};
+    return{cat:"Business Meals & Entertainment",kind:"restaurant",conf:92,action:"approve",tier:"src"};
+  }
+  // L2: knowledge base (longest-key-first so "amazon mktpl" beats "amazon")
+  for(const k of KB_KEYS){if(nv.includes(k)){const e=KB_MAP.get(k);
+    if(e.cat==="DISCARD")return{cat:"Other / Uncategorized",kind:e.kind,conf:92,action:"discard",tier:"KB"};
+    return{cat:e.cat,kind:e.kind,conf:93,action:"approve",tier:"KB"}}}
+
+  // L4: morphology (only reached when KB + patterns miss)
+  const isFood=FOOD_TOKEN.test(nv), isCorp=CORP_TOKEN.test(nv), isRetail=RETAIL_TOKEN.test(nv);
+  if(MED_TOKEN.test(nv))return{cat:"Other / Uncategorized",kind:"medical",conf:82,action:"discard",tier:"morph"};
+  if(EDU_TOKEN.test(nv))return{cat:"Education & Training",kind:"education",conf:76,action:"approve",tier:"morph"};
+  // MEALS GATE: food classification requires positive food evidence, never corporate-looking names
+  if(isFood&&!isCorp)return{cat:"Business Meals & Entertainment",kind:"restaurant",conf:80,action:"approve",tier:"morph"};
+  if(isRetail&&!isFood)return{cat:"Office Supplies & Software",kind:"retail",conf:74,action:"approve",tier:"morph"};
+  if(isCorp&&!isFood)return{cat:"Office Supplies & Software",kind:"vendor",conf:68,action:"triage",tier:"morph"};
+
+  // L6: Copilot prior — weak, and CANNOT produce Business Meals on its own
+  const COP_SAFE={"Travel & Vacation":["Travel & Lodging","travel",58],"Shops":["Office Supplies & Software","retail",62],"Clothing":["Office Supplies & Software","apparel",62],"Groceries":["Office Supplies & Software","retail",58],"Car":["Car & Truck Expenses","vehicle",64],"Transportation":["Car & Truck Expenses","transit",58],"Subscriptions":["Subscriptions & Memberships","subscription",60],"Gym":["Health & Wellness R&D","wellness",58],"Home":["Office Supplies & Software","retail",56],"Insurance":["Insurance","insurance",70],"Rent":["Rent & Lease","rent",64],"Utilities":["Utilities","utility",66]};
+  if(cop==="Healthcare"||cop==="Donations")return{cat:"Other / Uncategorized",kind:"personal",conf:75,action:"discard",tier:"cop"};
+  if(COP_SAFE[cop]){const[c,k,cf]=COP_SAFE[cop];return{cat:c,kind:k,conf:cf,action:"triage",tier:"cop"}}
+  // Restaurants prior WITHOUT food evidence => NOT a meal. Unknown, needs review.
+  if(cop==="Restaurants")return{cat:"Other / Uncategorized",kind:"unknown",conf:40,action:"triage",tier:"cop-weak"};
+  return{cat:"Other / Uncategorized",kind:"unknown",conf:35,action:"triage",tier:"none"};
+}
 
 function vendorRule(t){
   const n=(t.rawMerchant||t.restaurant||t.description||"").toLowerCase();
@@ -231,7 +334,12 @@ function vendorRule(t){
   return{cat:"Other / Uncategorized",conf:45,action:"triage",desc:`${vendor} (${nd(t.date)})`};
 }
 
-function localCat(t){const vr=vendorRule(t);if(vr){return{category:vr.cat,confidence:vr.conf,action:vr.action,vendorDesc:vr.desc}}const nm=(t.rawMerchant||t.rawDescription||t.description||"").toLowerCase();for(const[k,v]of Object.entries(CAT_RULES)){if(nm.includes(k))return{category:v,confidence:92}}const d=(t.rawDescription||t.description||t.rawMerchant||"").toLowerCase();if(t.source==="doordash"||t.source==="ubereats")return{category:"Business Meals & Entertainment",confidence:95};if(t.source==="uber")return{category:"Car & Truck Expenses",confidence:92};if(COFFEE.test(d)&&t.amount<15)return{category:"Business Meals & Entertainment",confidence:90};if(OFFICE.test(d))return{category:"Office Supplies & Software",confidence:t.amount<200?90:85};if(/at&t|verizon|t-mobile|comcast|spectrum|xfinity|internet|phone|cellular/i.test(d))return{category:"Telephone & Internet",confidence:90};if(/insurance|geico|state\s*farm|allstate/i.test(d))return{category:"Insurance",confidence:88};if(/hotel|marriott|hilton|hyatt|airbnb/i.test(d))return{category:"Travel & Lodging",confidence:90};if(/fedex|ups|usps|shipping|postage/i.test(d))return{category:"Shipping & Delivery",confidence:92};return null}
+function localCat(t){const rv=resolveVendor(t);
+  if(rv&&rv.tier==="KB")return{category:rv.cat,confidence:rv.conf,action:rv.action,kind:rv.kind};
+  const vr=vendorRule(t);if(vr&&vr.conf>=80){return{category:vr.cat,confidence:vr.conf,action:vr.action,vendorDesc:vr.desc,kind:vr.kind||"vendor"}}
+  if(rv&&rv.tier==="morph")return{category:rv.cat,confidence:rv.conf,action:rv.action,kind:rv.kind};
+  if(vr)return{category:vr.cat,confidence:vr.conf,action:vr.action,vendorDesc:vr.desc,kind:vr.kind||"vendor"};
+  if(rv)return{category:rv.cat,confidence:rv.conf,action:rv.action,kind:rv.kind};const nm=(t.rawMerchant||t.rawDescription||t.description||"").toLowerCase();for(const[k,v]of Object.entries(CAT_RULES)){if(nm.includes(k))return{category:v,confidence:92}}const d=(t.rawDescription||t.description||t.rawMerchant||"").toLowerCase();if(t.source==="doordash"||t.source==="ubereats")return{category:"Business Meals & Entertainment",confidence:95};if(t.source==="uber")return{category:"Car & Truck Expenses",confidence:92};if(COFFEE.test(d)&&t.amount<15)return{category:"Business Meals & Entertainment",confidence:90};if(OFFICE.test(d))return{category:"Office Supplies & Software",confidence:t.amount<200?90:85};if(/at&t|verizon|t-mobile|comcast|spectrum|xfinity|internet|phone|cellular/i.test(d))return{category:"Telephone & Internet",confidence:90};if(/insurance|geico|state\s*farm|allstate/i.test(d))return{category:"Insurance",confidence:88};if(/hotel|marriott|hilton|hyatt|airbnb/i.test(d))return{category:"Travel & Lodging",confidence:90};if(/fedex|ups|usps|shipping|postage/i.test(d))return{category:"Shipping & Delivery",confidence:92};return null}
 
 // ─── AI ───────────────────────────────────────────
 async function aiCat(items,apiKey){const prompt=`Bookkeeping: categorize for TY${TY}. Categories: ${CATS.join(", ")}\nReturn ONLY JSON array: [{"index":0,"category":"...","confidence":85}]\n${items.map((t,i)=>`${i}. "${t.rawDescription||t.description}" $${t.amount.toFixed(2)}`).join("\n")}`;try{const r=await fetch("/api/categorize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({anthropicKey:apiKey,prompt})});const d=await r.json();const txt=d.content?.map(b=>b.text||"").join("")||"";return JSON.parse(txt.replace(/```json|```/g,"").trim())}catch(e){return null}}
@@ -280,7 +388,7 @@ export default function Home(){
   const cGmail=()=>{if(!gCId){alert("Enter Client ID");return}window.open(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${gCId}&redirect_uri=${encodeURIComponent(window.location.origin+"/api/auth")}&response_type=token&scope=${encodeURIComponent("https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send")}&state=gmail&prompt=consent`,"_blank","width=500,height=600")};
 
   // ─── Import ─────────────────────────────────────
-  const importSrc=useCallback(async(file,source)=>{if(!file)return;if(imp.has(source)){if(!confirm(`${source} already imported. Re-import will reset. Continue?`))return;setTxns(p=>p.filter(t=>t.source!==source))}setProc(true);const sp=(pct,detail)=>setProg({pct:Math.min(100,Math.round(pct)),detail});sp(2,"Reading...");const text=await file.text();let parsed=[];if(source==="creditcard")parsed=parseCC(text);else if(source==="doordash")parsed=parseDD(text);else if(source==="ubereats")parsed=parseUber(text,true);else if(source==="uber")parsed=parseUber(text,false);sp(10,`${parsed.length} orders`);if(!parsed.length){sp(100,"No transactions found");setTimeout(()=>{setProc(false);setProg(null)},2e3);return}sp(15,"Dedup...");const all2=[...txns.filter(t=>t.status!=="in_wave"),...parsed.map((t,i)=>({...t,id:`${source}-${i}-${Date.now()}`,category:null,confidence:null,status:"pending"}))];const final=intDedup(crossDedup(all2)).map(t=>({...t,id:t.id||`m-${Math.random().toString(36).slice(2)}`,status:t.isDuplicate?"duplicate":(t.status||"pending")}));sp(25,"Descriptions...");sp(30,"Categorizing...");const needAI=[];for(const t of final){if(t.status==="duplicate")continue;const vk=vendorKey(t);if(vk&&learnedRules[vk]){t.category=learnedRules[vk];t.confidence=95;t.action="approve"}else if(!t.category){const lc=localCat(t);if(lc){t.category=lc.category;t.confidence=lc.confidence;if(lc.vendorDesc)t.description=lc.vendorDesc;if(lc.action)t.action=lc.action}else needAI.push(t)}}if(needAI.length>0&&apiKey){const res=await aiCatP(needAI,40,apiKey,d=>{sp(35+(d/needAI.length)*55,`AI: ${d}/${needAI.length}`)});res.forEach((r,i)=>{if(r&&needAI[i]){const idx=final.findIndex(t=>t.id===needAI[i].id);if(idx!==-1){final[idx].category=r.category;final[idx].confidence=r.confidence}}})}sp(92,"Writing notes...");final.forEach(t=>{if(t.status!=="duplicate")t.description=richNotes(t)});sp(95,"Finalizing...");let result=final.map(t=>({...t,category:t.category||"Other / Uncategorized",description:t.description||richNotes(t),status:t.status==="duplicate"?"duplicate":(t.confidence>=80?"approved":t.status),needsReceipt:t.status!=="duplicate"}));sp(100,"✅ Done");setTxns(result);setImp(p=>new Set([...p,source]));addLog("📥","Import complete",`${source}: ${result.filter(t=>t.status!=="duplicate").length} transactions, ${result.filter(t=>t.status==="duplicate").length} duplicates`);await new Promise(r=>setTimeout(r,500));setProc(false);setProg(null);setPage("review")},[txns,thresh,apiKey,learnedRules]);
+  const importSrc=useCallback(async(file,source)=>{if(!file)return;if(imp.has(source)){if(!confirm(`${source} already imported. Re-import will reset. Continue?`))return;setTxns(p=>p.filter(t=>t.source!==source))}setProc(true);const sp=(pct,detail)=>setProg({pct:Math.min(100,Math.round(pct)),detail});sp(2,"Reading...");const text=await file.text();let parsed=[];if(source==="creditcard")parsed=parseCC(text);else if(source==="doordash")parsed=parseDD(text);else if(source==="ubereats")parsed=parseUber(text,true);else if(source==="uber")parsed=parseUber(text,false);sp(10,`${parsed.length} orders`);if(!parsed.length){sp(100,"No transactions found");setTimeout(()=>{setProc(false);setProg(null)},2e3);return}sp(15,"Dedup...");const all2=[...txns.filter(t=>t.status!=="in_wave"),...parsed.map((t,i)=>({...t,id:`${source}-${i}-${Date.now()}`,category:null,confidence:null,status:"pending"}))];const final=intDedup(crossDedup(all2)).map(t=>({...t,id:t.id||`m-${Math.random().toString(36).slice(2)}`,status:t.isDuplicate?"duplicate":(t.status||"pending")}));sp(25,"Descriptions...");sp(30,"Categorizing...");const needAI=[];for(const t of final){if(t.status==="duplicate")continue;const vk=vendorKey(t);if(vk&&learnedRules[vk]){t.category=learnedRules[vk];t.confidence=95;t.action="approve"}else if(!t.category){const lc=localCat(t);if(lc){t.category=lc.category;t.confidence=lc.confidence;if(lc.vendorDesc)t.description=lc.vendorDesc;if(lc.action)t.action=lc.action;if(lc.kind)t.kind=lc.kind}else needAI.push(t)}}if(needAI.length>0&&apiKey){const res=await aiCatP(needAI,40,apiKey,d=>{sp(35+(d/needAI.length)*55,`AI: ${d}/${needAI.length}`)});res.forEach((r,i)=>{if(r&&needAI[i]){const idx=final.findIndex(t=>t.id===needAI[i].id);if(idx!==-1){final[idx].category=r.category;final[idx].confidence=r.confidence}}})}sp(92,"Writing notes...");final.forEach(t=>{if(t.status!=="duplicate")t.description=richNotes(t)});sp(95,"Finalizing...");let result=final.map(t=>({...t,category:t.category||"Other / Uncategorized",description:t.description||richNotes(t),status:t.status==="duplicate"?"duplicate":(t.confidence>=80?"approved":t.status),needsReceipt:t.status!=="duplicate"}));sp(100,"✅ Done");setTxns(result);setImp(p=>new Set([...p,source]));addLog("📥","Import complete",`${source}: ${result.filter(t=>t.status!=="duplicate").length} transactions, ${result.filter(t=>t.status==="duplicate").length} duplicates`);await new Promise(r=>setTimeout(r,500));setProc(false);setProg(null);setPage("review")},[txns,thresh,apiKey,learnedRules]);
 
   // ─── Receipt search ─────────────────────────────
   const COPILOT_EXCLUDE_TYPES=new Set(["internal transfer","income"]);
@@ -289,7 +397,7 @@ export default function Home(){
   const COPILOT_CAT_MAP={"Restaurants":"Business Meals & Entertainment","Groceries":"Business Meals & Entertainment","Transportation":"Car & Truck Expenses","Car":"Car & Truck Expenses","Travel & Vacation":"Travel & Lodging","Subscriptions":"Subscriptions & Memberships","Insurance":"Insurance","Rent":"Rent & Lease","Utilities":"Utilities","Gym":"Other / Uncategorized","Shops":"Office Supplies & Software","Clothing":"Office Supplies & Software","Home":"Repairs & Maintenance","Personal Care":"Other / Uncategorized","Other":"Other / Uncategorized"};
 
   const importAllCopilot=useCallback(async(file)=>{if(!file)return;if(imp.has("copilot")){if(!confirm("Copilot already imported. Re-import will reset. Continue?"))return;setTxns(p=>p.filter(t=>t.source!=="copilot"))}setProc(true);const sp=(pct,detail)=>setProg({pct,detail});sp(5,"Reading Copilot...");const text=await file.text();const lines=text.trim().split("\n");const h=lines[0].split(",").map(s=>stripQ(s).toLowerCase());const dateI=h.findIndex(x=>x==="date");const nameI=h.findIndex(x=>x==="name");const amtI=h.findIndex(x=>x==="amount");const catI=h.findIndex(x=>x==="category");const typeI=h.findIndex(x=>x==="type");const exclI=h.findIndex(x=>x==="excluded");const acctI=h.findIndex(x=>x==="account");const maskI=h.findIndex(x=>x==="account mask");const parsed=[];let totalExp=0,totalCount=0;const existingSources=imp;for(let i=1;i<lines.length;i++){const c=cl(lines[i]);const date=stripQ(c[dateI]||"");if(!date.startsWith("2025"))continue;const name=stripQ(c[nameI]||"");const amt=parseFloat(stripQ(c[amtI]||"0"))||0;const cat=stripQ(c[catI]||"");const typ=stripQ(c[typeI]||"");const excl=stripQ(c[exclI]||"");const acct=stripQ(c[acctI]||"");const mask=stripQ(c[maskI]||"");if(typ==="regular"&&amt>0&&excl!=="true"){if(!COPILOT_EXCLUDE_PAT.test(name)){totalExp+=amt;totalCount++}}if(COPILOT_EXCLUDE_TYPES.has(typ))continue;if(excl==="true")continue;if(amt<=0)continue;if(COPILOT_EXCLUDE_CATS.has(cat))continue;if(COPILOT_EXCLUDE_PAT.test(name))continue;const isUber=/uber eats|ubereats/i.test(name);const isDD=/doordash|dd \*/i.test(name);const isUberRide=/^uber(?! eats)/i.test(name)&&!isUber;
-    const txnDate=nd(date);const nameLower=name.toLowerCase();const existsAlready=txns.some(et=>{const etDate=nd(et.date);const dateDiff=Math.abs(new Date(etDate)-new Date(txnDate))/864e5;if(dateDiff>2)return false;const amtDiff=Math.abs(et.amount-amt)/Math.max(et.amount,amt,1);if(amtDiff<0.20)return true;const etName=(et.rawMerchant||et.restaurant||et.description||"").toLowerCase();if(dateDiff<=1&&(etName.includes(nameLower.slice(0,8))||nameLower.includes((et.restaurant||"").toLowerCase().slice(0,8))))return true;return false});if(existsAlready)continue;if(isUber&&existingSources.has("ubereats"))continue;if(isDD&&existingSources.has("doordash"))continue;if(isUberRide&&existingSources.has("uber"))continue;if(/uber eats/i.test(name)&&existingSources.has("ubereats"))continue;if(/^uber\s/i.test(name)&&!isUber&&existingSources.has("uber"))continue;let src="copilot";let rest=name;if(isDD){src="doordash";rest=name.replace(/dd \*doordash\s*/i,"").trim()}else if(isUber){src="ubereats"}else if(isUberRide){src="uber"}parsed.push({date,description:"",rawMerchant:name,restaurant:rest,amount:amt,source:src,copilotCategory:cat,copilotAccount:`${acct} (${mask})`,category:COPILOT_CAT_MAP[cat]||null,confidence:cat&&COPILOT_CAT_MAP[cat]?88:50})}setCopilotTotal(totalExp);setCopilotCount(totalCount);sp(30,`${parsed.length} expenses (excl already imported)`);if(!parsed.length){sp(100,"No new transactions");setTimeout(()=>{setProc(false);setProg(null)},2e3);return}sp(40,"Dedup...");const all2=[...txns,...parsed.map((t,i)=>({...t,id:`cop-${i}-${Date.now()}`,status:"pending"}))];const final=intDedup(crossDedup(all2)).map(t=>({...t,id:t.id||`m-${Math.random().toString(36).slice(2)}`,status:t.isDuplicate?"duplicate":(t.status||"pending")}));sp(60,"Descriptions...");final.forEach(t=>{if(t.status==="duplicate")return;const vk=vendorKey(t);if(vk&&learnedRules[vk]){t.category=learnedRules[vk];t.confidence=95;t.action="approve"}else{const lc=localCat(t);if(lc){t.category=lc.category;t.confidence=lc.confidence;if(lc.action)t.action=lc.action}}t.description=richNotes(t)});let result=final.map(t=>({...t,category:t.category||"Other / Uncategorized",description:t.description||richNotes(t),status:t.status==="duplicate"?"duplicate":(t.confidence>=80?"approved":t.status),needsReceipt:t.status!=="duplicate"}));sp(90,"Preparing triage...");const dupes=result.filter(t=>t.status==="duplicate");const discards=result.filter(t=>t.action==="discard"&&t.status!=="duplicate");const autoApprove=result.filter(t=>t.action==="approve"&&t.confidence>=85&&t.status!=="duplicate").map(t=>({...t,status:"approved"}));const needsTriage=result.filter(t=>t.status!=="duplicate"&&t.action!=="discard"&&!(t.action==="approve"&&t.confidence>=85)).sort((a,b)=>b.amount-a.amount);addLog("📊","Copilot categorized",`${autoApprove.length} auto-approved, ${needsTriage.length} to triage, ${discards.length} auto-discarded`);setTxns(prev=>[...prev,...dupes,...autoApprove]);if(needsTriage.length>0){setTriageItems(needsTriage);setTriageMode("copilot")}sp(100,"✅ Done");setImp(p=>new Set([...p,"copilot"]));await new Promise(r=>setTimeout(r,500));setProc(false);setProg(null);setPage(needsTriage.length>0?"triage":"review")},[txns,imp,learnedRules]);
+    const txnDate=nd(date);const nameLower=name.toLowerCase();const existsAlready=txns.some(et=>{const etDate=nd(et.date);const dateDiff=Math.abs(new Date(etDate)-new Date(txnDate))/864e5;if(dateDiff>2)return false;const amtDiff=Math.abs(et.amount-amt)/Math.max(et.amount,amt,1);if(amtDiff<0.20)return true;const etName=(et.rawMerchant||et.restaurant||et.description||"").toLowerCase();if(dateDiff<=1&&(etName.includes(nameLower.slice(0,8))||nameLower.includes((et.restaurant||"").toLowerCase().slice(0,8))))return true;return false});if(existsAlready)continue;if(isUber&&existingSources.has("ubereats"))continue;if(isDD&&existingSources.has("doordash"))continue;if(isUberRide&&existingSources.has("uber"))continue;if(/uber eats/i.test(name)&&existingSources.has("ubereats"))continue;if(/^uber\s/i.test(name)&&!isUber&&existingSources.has("uber"))continue;let src="copilot";let rest=name;if(isDD){src="doordash";rest=name.replace(/dd \*doordash\s*/i,"").trim()}else if(isUber){src="ubereats"}else if(isUberRide){src="uber"}parsed.push({date,description:"",rawMerchant:name,restaurant:rest,amount:amt,source:src,copilotCategory:cat,copilotAccount:`${acct} (${mask})`,category:COPILOT_CAT_MAP[cat]||null,confidence:cat&&COPILOT_CAT_MAP[cat]?88:50})}setCopilotTotal(totalExp);setCopilotCount(totalCount);sp(30,`${parsed.length} expenses (excl already imported)`);if(!parsed.length){sp(100,"No new transactions");setTimeout(()=>{setProc(false);setProg(null)},2e3);return}sp(40,"Dedup...");const all2=[...txns,...parsed.map((t,i)=>({...t,id:`cop-${i}-${Date.now()}`,status:"pending"}))];const final=intDedup(crossDedup(all2)).map(t=>({...t,id:t.id||`m-${Math.random().toString(36).slice(2)}`,status:t.isDuplicate?"duplicate":(t.status||"pending")}));sp(60,"Descriptions...");final.forEach(t=>{if(t.status==="duplicate")return;const vk=vendorKey(t);if(vk&&learnedRules[vk]){t.category=learnedRules[vk];t.confidence=95;t.action="approve"}else{const lc=localCat(t);if(lc){t.category=lc.category;t.confidence=lc.confidence;if(lc.action)t.action=lc.action;if(lc.kind)t.kind=lc.kind}}t.description=richNotes(t)});let result=final.map(t=>({...t,category:t.category||"Other / Uncategorized",description:t.description||richNotes(t),status:t.status==="duplicate"?"duplicate":(t.confidence>=80?"approved":t.status),needsReceipt:t.status!=="duplicate"}));sp(90,"Preparing triage...");const dupes=result.filter(t=>t.status==="duplicate");const discards=result.filter(t=>t.action==="discard"&&t.status!=="duplicate");const autoApprove=result.filter(t=>t.action==="approve"&&t.confidence>=85&&t.status!=="duplicate").map(t=>({...t,status:"approved"}));const needsTriage=result.filter(t=>t.status!=="duplicate"&&t.action!=="discard"&&!(t.action==="approve"&&t.confidence>=85)).sort((a,b)=>b.amount-a.amount);addLog("📊","Copilot categorized",`${autoApprove.length} auto-approved, ${needsTriage.length} to triage, ${discards.length} auto-discarded`);setTxns(prev=>[...prev,...dupes,...autoApprove]);if(needsTriage.length>0){setTriageItems(needsTriage);setTriageMode("copilot")}sp(100,"✅ Done");setImp(p=>new Set([...p,"copilot"]));await new Promise(r=>setTimeout(r,500));setProc(false);setProg(null);setPage(needsTriage.length>0?"triage":"review")},[txns,imp,learnedRules]);
 
   const pullFromEmail=useCallback(async()=>{setProc(true);const sp=(pct,detail)=>setProg({pct,detail});sp(5,"Scanning for receipts...");const queries=["subject:receipt","subject:order confirmation","subject:your order","subject:payment received","subject:invoice"];const found=[];const existingKeys=new Set(txns.map(t=>`${nd(t.date)}|${t.amount.toFixed(2)}`));let searched=0;for(const q of queries){if(gTok){try{const r=await fetch("/api/gmail",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:gTok,query:`${q} after:2025-01-01 before:2025-12-31`})});const d=await r.json();if(d.found&&d.receiptAmount){const key=`${nd(d.date||"")}|${d.receiptAmount.toFixed(2)}`;if(!existingKeys.has(key)){found.push({date:d.date||"2025-01-01",description:d.subject||"Email receipt",rawMerchant:d.subject||"",amount:d.receiptAmount,source:"copilot",receiptFound:true,receiptLink:d.link,receiptSubject:d.subject,receiptProvider:"gmail",receiptMsgId:d.messageId})}}}catch(e){}}searched++;sp(5+(searched/queries.length)*90,`Searched ${searched}/${queries.length} queries... ${found.length} found`)}sp(100,`Found ${found.length} potential expenses from email`);if(found.length>0){const tagged=found.map((t,i)=>({...t,id:`email-${i}-${Date.now()}`,status:"pending",category:"Other / Uncategorized",confidence:50,needsReceipt:true}));setTriageItems(tagged.sort((a,b)=>b.amount-a.amount));setTriageMode("email");setPage("triage")}setProc(false);setProg(null)},[gTok,oTok,txns]);
 
@@ -315,6 +423,60 @@ export default function Home(){
   const vendorKey=(t)=>{const raw=(t.rawMerchant||t.restaurant||t.description||"").toLowerCase();return raw.replace(/dd \*doordash\s*/i,"").replace(/\*[a-z0-9]+/gi,"").replace(/[^a-z0-9]/g,"").slice(0,18)};
   const saveVendorRule=(t,category)=>{const k=vendorKey(t);if(!k||k.length<3)return;setLearnedRules(prev=>{const next={...prev,[k]:category};try{localStorage.setItem("wavebot-rules",JSON.stringify(next))}catch(e){}return next});addLog("🧠","Learned rule",`${(t.rawMerchant||"vendor").slice(0,30)} → ${category}`)};
   const clearLearnedRules=()=>{if(!confirm("Clear all learned vendor rules?"))return;setLearnedRules({});try{localStorage.removeItem("wavebot-rules")}catch(e){}};
+  const resolveUnknownsAI=useCallback(async()=>{
+    if(!apiKey){alert("Add your Anthropic API key in Settings to use AI vendor resolution.");return}
+    const unknowns=triageItems.filter(t=>(t.confidence==null||t.confidence<70)||t.kind==="unknown"||t.category==="Other / Uncategorized");
+    if(!unknowns.length){alert("No unknown vendors to resolve.");return}
+    const byVendor=new Map();
+    unknowns.forEach(t=>{const k=normVendor(t.rawMerchant||t.restaurant||"");if(k&&!byVendor.has(k))byVendor.set(k,t)});
+    const list=[...byVendor.keys()];
+    setProc(true);setProg({pct:2,detail:`Resolving ${list.length} unknown vendors...`});
+    const CATLIST=CATS.join(" | ");
+    const resolved={};let done=0;
+    for(let i=0;i<list.length;i+=40){
+      const batch=list.slice(i,i+40);
+      const prompt=`You are a bookkeeping assistant. For each merchant name below, identify what the business actually is, then assign the best expense category for a US small business (health & wellness R&D company).
+
+Valid categories: ${CATLIST}
+
+Rules:
+- Only use "Business Meals & Entertainment" if the merchant is genuinely a restaurant, bar, cafe, caterer, or event/entertainment venue.
+- Retail/consumer goods -> "Office Supplies & Software". Electronics/hardware -> "Technology".
+- Baby, wellness, or nutrition products -> "Health & Wellness R&D".
+- Doctors, clinics, labs, pharmacies, personal medical -> "EXCLUDE".
+- Charities/donations -> "EXCLUDE".
+- If you do not recognize the merchant, use "UNKNOWN".
+
+Return ONLY a JSON array, no prose, no markdown:
+[{"v":"<merchant exactly as given>","what":"<3-6 word description of the business>","cat":"<category|EXCLUDE|UNKNOWN>","conf":<0-100>}]
+
+Merchants:
+${batch.map(b=>`- ${b}`).join("\n")}`;
+      try{
+        const r=await fetch("/api/categorize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({anthropicKey:apiKey,prompt})});
+        const d=await r.json();
+        const txt=(d.content||[]).map(b=>b.text||"").join("");
+        const arr=JSON.parse(txt.replace(/```json|```/g,"").trim());
+        arr.forEach(x=>{if(x&&x.v)resolved[String(x.v).toLowerCase()]={cat:x.cat,what:x.what,conf:x.conf||75}});
+      }catch(e){console.error("AI resolve batch failed",e)}
+      done+=batch.length;setProg({pct:Math.min(98,(done/list.length)*100),detail:`Resolved ${done}/${list.length} vendors`});
+    }
+    // Apply + persist as learned rules
+    let applied=0,excluded=0,stillUnknown=0;const newRules={};
+    setTriageItems(prev=>{const kept=[];
+      prev.forEach(t=>{const k=normVendor(t.rawMerchant||t.restaurant||"");const r=resolved[k];
+        if(!r||r.cat==="UNKNOWN"){stillUnknown++;kept.push(t);return}
+        if(r.cat==="EXCLUDE"){excluded++;return}
+        if(!CATS.includes(r.cat)){kept.push(t);return}
+        const upd={...t,category:r.cat,confidence:Math.min(90,r.conf||78),kind:"ai",aiWhat:r.what};
+        upd.description=richNotes(upd);newRules[k]=r.cat;applied++;kept.push(upd)});
+      return kept});
+    setLearnedRules(prev=>{const next={...prev,...newRules};try{localStorage.setItem("wavebot-rules",JSON.stringify(next))}catch(e){}return next});
+    addLog("🤖","AI vendor resolution",`${applied} categorized, ${excluded} excluded, ${stillUnknown} still unknown (${list.length} vendors)`);
+    setProc(false);setProg(null);
+    alert(`AI resolution complete:\n${applied} categorized\n${excluded} auto-excluded\n${stillUnknown} still unknown`);
+  },[triageItems,apiKey]);
+
   const exportCSV=useCallback(()=>{const rows=[["Date","Source","Description","Category","Amount","Status","Receipt","Wave ID"]];txns.filter(t=>t.status!=="duplicate").forEach(t=>{rows.push([nd(t.date),t.source,`"${(t.description||"").replace(/"/g,'""')}"`,t.category||"",t.amount.toFixed(2),t.status,t.receiptFound?"Yes":"No",t.waveId||""])});const csv=rows.map(r=>r.join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`wave-expenses-TY${TY}-${new Date().toISOString().split("T")[0]}.csv`;a.click();URL.revokeObjectURL(url)},[txns]);
 
   const testPushOne=useCallback(async(id)=>{const t=txns.find(x=>x.id===id);if(!t)return;if(!wTok){alert("Enter Wave API token in Settings");return}const r=await pushOne(t);if(r.success){setTxns(p=>p.map(x=>x.id===id?{...x,status:"pushed",waveId:r.waveId}:x));alert(`✅ Pushed! Wave ID: ${r.waveId}${t.receiptFound?" | Receipt forwarded to Wave":""}`);}else{alert(`❌ Error: ${r.error}`)}},[txns,wTok,pushOne]);
@@ -358,7 +520,7 @@ export default function Home(){
             <button onClick={()=>setTriageView("carousel")} style={{...bt(),background:triageView==="carousel"?T.accentBg:"transparent",color:triageView==="carousel"?T.accent:T.dim}}>🎠 Carousel</button>
             <button onClick={()=>setTriageView("list")} style={{...bt(),background:triageView==="list"?T.accentBg:"transparent",color:triageView==="list"?T.accent:T.dim}}>📋 List</button>
             <div style={{flex:1}}/>
-            <button onClick={()=>{triageKeepAll();setPage("review")}} style={{...bt(),background:T.greenBg,color:T.green}}>✓ Keep All {triageItems.length}</button>
+            <button onClick={resolveUnknownsAI} style={{...bt(),background:T.cyanBg,color:T.cyan}}>🤖 AI resolve unknowns</button><button onClick={()=>{triageKeepAll();setPage("review")}} style={{...bt(),background:T.greenBg,color:T.green}}>✓ Keep All {triageItems.length}</button>
             <button onClick={()=>{triageDiscardAll();setPage("review")}} style={{...bt(),background:T.redBg,color:T.red}}>✗ Discard All</button>
           </div>
 
