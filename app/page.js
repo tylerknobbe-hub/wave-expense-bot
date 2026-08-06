@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-const APP_VERSION="v6.1";
+const APP_VERSION="v6.2";
 const T={bg:"#08090e",card:"#10111a",cardHover:"#161724",border:"#1c1d30",text:"#dcdff0",dim:"#555775",accent:"#818cf8",accentBg:"rgba(129,140,248,0.1)",green:"#4ade80",greenBg:"rgba(74,222,128,0.08)",red:"#fb7185",redBg:"rgba(251,113,133,0.08)",amber:"#fbbf24",amberBg:"rgba(251,191,36,0.08)",blue:"#60a5fa",blueBg:"rgba(96,165,250,0.08)",purple:"#c084fc",purpleBg:"rgba(192,132,252,0.08)",doordash:"#FF3008",ubereats:"#06C167",dateText:"#b0b4cc",cyan:"#22d3ee",cyanBg:"rgba(34,211,238,0.08)"};
 const CATS=["Business Meals & Entertainment","Car & Truck Expenses","Travel & Lodging","Office Supplies & Software","Subscriptions & Memberships","Telephone & Internet","Shipping & Delivery","Insurance","Rent & Lease","Utilities","Wages & Salaries","Education & Training","Equipment & Hardware","Advertising & Promotion","Bank Charges & Fees","Contractors & Freelancers","Interest & Penalties","Legal & Professional Services","Repairs & Maintenance","Taxes & Licenses","Other / Uncategorized"];
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -432,7 +432,7 @@ export default function Home(){
     const list=[...byVendor.keys()];
     setProc(true);setProg({pct:2,detail:`Resolving ${list.length} unknown vendors...`});
     const CATLIST=CATS.join(" | ");
-    const resolved={};let done=0;
+    const resolved={};let done=0;const errs=[];
     for(let i=0;i<list.length;i+=40){
       const batch=list.slice(i,i+40);
       const prompt=`You are a bookkeeping assistant. For each merchant name below, identify what the business actually is, then assign the best expense category for a US small business (health & wellness R&D company).
@@ -455,26 +455,28 @@ ${batch.map(b=>`- ${b}`).join("\n")}`;
       try{
         const r=await fetch("/api/categorize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({anthropicKey:apiKey,prompt})});
         const d=await r.json();
+        if(d&&d.error){errs.push(d.error.message||JSON.stringify(d.error));console.error("API error:",d.error);continue}
         const txt=(d.content||[]).map(b=>b.text||"").join("");
         const arr=JSON.parse(txt.replace(/```json|```/g,"").trim());
         arr.forEach(x=>{if(x&&x.v)resolved[String(x.v).toLowerCase()]={cat:x.cat,what:x.what,conf:x.conf||75}});
-      }catch(e){console.error("AI resolve batch failed",e)}
+      }catch(e){console.error("AI resolve batch failed",e);errs.push(String(e&&e.message||e))}
       done+=batch.length;setProg({pct:Math.min(98,(done/list.length)*100),detail:`Resolved ${done}/${list.length} vendors`});
     }
-    // Apply + persist as learned rules
+    // Apply + persist as learned rules (computed synchronously so counts are accurate)
     let applied=0,excluded=0,stillUnknown=0;const newRules={};
-    setTriageItems(prev=>{const kept=[];
-      prev.forEach(t=>{const k=normVendor(t.rawMerchant||t.restaurant||"");const r=resolved[k];
-        if(!r||r.cat==="UNKNOWN"){stillUnknown++;kept.push(t);return}
-        if(r.cat==="EXCLUDE"){excluded++;return}
-        if(!CATS.includes(r.cat)){kept.push(t);return}
-        const upd={...t,category:r.cat,confidence:Math.min(90,r.conf||78),kind:"ai",aiWhat:r.what};
-        upd.description=richNotes(upd);newRules[k]=r.cat;applied++;kept.push(upd)});
-      return kept});
+    const kept=[];
+    triageItems.forEach(t=>{const k=normVendor(t.rawMerchant||t.restaurant||"");const r=resolved[k];
+      if(!r||r.cat==="UNKNOWN"){stillUnknown++;kept.push(t);return}
+      if(r.cat==="EXCLUDE"){excluded++;return}
+      if(!CATS.includes(r.cat)){stillUnknown++;kept.push(t);return}
+      const upd={...t,category:r.cat,confidence:Math.min(90,r.conf||78),kind:"ai",aiWhat:r.what};
+      upd.description=richNotes(upd);newRules[k]=r.cat;applied++;kept.push(upd)});
+    setTriageItems(kept);
+    console.log("AI resolve:",{vendors:list.length,resolvedKeys:Object.keys(resolved).length,applied,excluded,stillUnknown});
     setLearnedRules(prev=>{const next={...prev,...newRules};try{localStorage.setItem("wavebot-rules",JSON.stringify(next))}catch(e){}return next});
     addLog("🤖","AI vendor resolution",`${applied} categorized, ${excluded} excluded, ${stillUnknown} still unknown (${list.length} vendors)`);
     setProc(false);setProg(null);
-    alert(`AI resolution complete:\n${applied} categorized\n${excluded} auto-excluded\n${stillUnknown} still unknown`);
+    alert(`AI resolution complete:\n${applied} categorized\n${excluded} auto-excluded\n${stillUnknown} still unknown`+(errs.length?`\n\n⚠ ${errs.length} batch error(s):\n${errs.slice(0,3).join("\n")}`:""));
   },[triageItems,apiKey]);
 
   const exportCSV=useCallback(()=>{const rows=[["Date","Source","Description","Category","Amount","Status","Receipt","Wave ID"]];txns.filter(t=>t.status!=="duplicate").forEach(t=>{rows.push([nd(t.date),t.source,`"${(t.description||"").replace(/"/g,'""')}"`,t.category||"",t.amount.toFixed(2),t.status,t.receiptFound?"Yes":"No",t.waveId||""])});const csv=rows.map(r=>r.join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`wave-expenses-TY${TY}-${new Date().toISOString().split("T")[0]}.csv`;a.click();URL.revokeObjectURL(url)},[txns]);
